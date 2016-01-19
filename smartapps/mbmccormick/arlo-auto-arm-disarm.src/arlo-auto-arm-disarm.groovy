@@ -133,54 +133,50 @@ List getArloDevices(strDeviceName = "") {
     return lstDevices
 }
 
-Boolean setArloModeArmed() {
-    return setArloMode("mode1")
+Boolean setArloModeArmed(Map mapArloDevice) {
+    return setArloMode(mapArloDevice, "mode1")
 }
 
-Boolean setArloQModeDisarmed() {
-    return setArloMode("mode0")
+Boolean setArloModeDisarmed(Map mapArloDevice) {
+    return setArloMode(mapArloDevice, "mode0")
 }
 
-Boolean setArloMode(String strModeId) {
-    for (strDeviceName in settings.lstArloDevices) {
-        def mapArloDevice = getArloDevice(strDeviceName)
-        
-        try {
-            httpPostJson(
-                [
-                    uri:     "https://arlo.netgear.com",
-                    path:    "/hmsweb/users/devices/notify/${mapArloDevice.deviceId}",
-                    headers: [
-                        xcloudId: mapArloDevice.xCloudId
-                    ] + getArloRequestHeaders(),
-                    body: [
-                        action:     "set",
-                        from:       "SmartThings",
-                        properties: [
-                            active: strModeId
-                        ],
-                        active:          strModeId,
-                        publishResponse: false,
-                        resource:        "modes",
-                        responseUrl:     "",
-                        to:              mapArloDevice.deviceId,
-                        transId:         ""
-                    ]
+Boolean setArloMode(Map mapArloDevice, String strArloModeId) {
+    try {
+        httpPostJson(
+            [
+                uri:     "https://arlo.netgear.com",
+                path:    "/hmsweb/users/devices/notify/${mapArloDevice.deviceId}",
+                headers: [
+                    xcloudId: mapArloDevice.xCloudId
+                ] + getArloRequestHeaders(),
+                body: [
+                    action:     "set",
+                    from:       "SmartThings",
+                    properties: [
+                        active: strArloModeId
+                    ],
+                    active:          strArloModeId,
+                    publishResponse: false,
+                    resource:        "modes",
+                    responseUrl:     "",
+                    to:              mapArloDevice.deviceId,
+                    transId:         ""
                 ]
-            ) { objResponse ->
-                if (objResponse.data.success == true) {
-                    return true
-                } else {
-                    log.error "Failed to set Arlo mode for ${mapArloDevice.xCloudId}. Response: ${objResponse.data}"
-                    
-                    return false
-                }
+            ]
+        ) { objResponse ->
+            if (objResponse.data.success == true) {
+                return true
+            } else {
+                log.error "Failed to set Arlo mode for ${mapArloDevice.xCloudId}. Response: ${objResponse.data}"
+
+                return false
             }
-        } catch (objException) {
-            log.error "Failed to set Arlo mode for ${mapArloDevice.xCloudId}. Exception: ${objException}"
-            
-            raise objException
         }
+    } catch (objException) {
+        log.error "Failed to set Arlo mode for ${mapArloDevice.xCloudId}. Exception: ${objException}"
+
+        raise objException
     }
 }
 
@@ -195,19 +191,27 @@ def initialize() {
 }
 
 def onModeChanged(mapEvent) {
-    log.debug("Mode changed to: ${mapEvent.value}")
+    log.debug("SmartThings mode changed to: ${mapEvent.value}")
     
     if (settings.lstArmedMode?.contains(mapEvent.value)) {
-        if (setArloModeArmed()) {
-            sendNotificationEvent("Arlo mode changed to Armed.")
-        } else {
-            sendNotificationEvent("Failed to change Arlo mode to Armed!")
+    	for (strDeviceName in settings.lstArloDevices) {
+        	def mapArloDevice = getArloDevice(strDeviceName)
+                
+            if (setArloModeArmed(mapArloDevice)) {
+                sendNotificationEvent("Arlo mode for ${mapArloDevice.deviceName} changed to Armed.")
+            } else {
+                sendNotificationEvent("Failed to change Arlo mode for ${mapArloDevice.deviceName} to Armed!")
+            }
         }
     } else if (settings.lstDisarmedMode?.contains(mapEvent.value)) {
-        if (setArloModeDisarmed()) {
-            sendNotificationEvent("Arlo mode changed to Disarmed.")
-        } else {
-            sendNotificationEvent("Failed to change Arlo mode to Disarmed!")
+        for (strDeviceName in settings.lstArloDevices) {
+        	def mapArloDevice = getArloDevice(strDeviceName)
+                
+            if (setArloModeDisarmed(mapArloDevice)) {
+                sendNotificationEvent("Arlo mode for ${mapArloDevice.deviceName} changed to Disarmed.")
+            } else {
+                sendNotificationEvent("Failed to change Arlo mode for ${mapArloDevice.deviceName} to Disarmed!")
+            }
         }
     }
 }
